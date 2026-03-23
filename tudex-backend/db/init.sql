@@ -82,12 +82,6 @@ CREATE INDEX IF NOT EXISTS idx_voice_packs_game ON voice_packs(game_id);
 CREATE INDEX IF NOT EXISTS idx_activity_log_dev ON activity_log(developer_id);
 CREATE INDEX IF NOT EXISTS idx_activity_log_game ON activity_log(game_id);
 
--- Insert default admin user (password: admin123 - CHANGE IN PRODUCTION!)
--- Password hash for 'admin123' using bcrypt
-INSERT INTO developers (email, password_hash, name, is_admin)
-VALUES ('admin@tudexgames.com', '$2b$10$placeholder_hash_change_me', 'Admin', true)
-ON CONFLICT (email) DO NOTHING;
-
 -- Insert initial launcher version
 INSERT INTO launcher_versions (version, download_url, is_current)
 VALUES (1, 'https://launcher.tudexgames.com/uploads/launcher/TudexGamesLauncher.exe', true)

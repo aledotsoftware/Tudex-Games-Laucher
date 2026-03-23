@@ -7,6 +7,7 @@ import GameDetailPage from './pages/GameDetailPage'
 import LauncherPage from './pages/LauncherPage'
 import LoginPage from './pages/LoginPage'
 import SetupPage from './pages/SetupPage'
+import LandingPage from './pages/LandingPage'
 
 // ===== Auth Context =====
 export const AuthContext = createContext(null)
@@ -162,6 +163,7 @@ function AppContent() {
   return (
     <AuthContext.Provider value={{ user, handleLogin, handleLogout }}>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/setup" element={<SetupPage onSetup={handleLogin} />} />
         <Route path="/login" element={
           user ? <Navigate to="/dashboard" replace /> : <LoginPage onLogin={handleLogin} />

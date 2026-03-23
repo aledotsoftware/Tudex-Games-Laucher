@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const gamesRoutes = require('./routes/games');
 const launcherRoutes = require('./routes/launcher');
 const db = require('./db');
+const { autoPublishLauncher } = require('./autoPublishLauncher');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -47,4 +48,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🎮 Tudex Games API running on port ${PORT}`);
+  // Auto-register launcher version if a new .exe was deployed
+  autoPublishLauncher();
 });
