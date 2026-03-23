@@ -26,6 +26,7 @@ services:
       - DB_PASS=tudex_secret_2026
       - DB_NAME=tudex_launcher
       - JWT_SECRET=tudex-jwt-secret-change-in-production
+      - BASE_URL=https://launcher.tudexgames.com
       - UPLOAD_DIR=/app/uploads
       - MAX_FILE_SIZE=5368709120
     volumes:
