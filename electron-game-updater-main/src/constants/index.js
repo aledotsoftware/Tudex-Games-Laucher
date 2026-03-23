@@ -1,0 +1,60 @@
+// Default configuration object
+export const DEFAULT_CONFIG = {
+    updaterUrl: "https://launcher.tudexgames.com/api/config",
+    launcherVer: 1,
+    selectedGame: "",
+    selectedLanguage: "",
+    games: [],
+  };
+
+// Language constants
+export const LANGUAGES = {
+  EN: 'EN',
+  ES: 'ES',
+  PT: 'PT', 
+  TW: 'TW'
+};
+
+// Language display names
+export const LANGUAGE_DISPLAY_NAMES = {
+  [LANGUAGES.EN]: 'English',
+  [LANGUAGES.ES]: 'Español',
+  [LANGUAGES.PT]: 'Português',
+  [LANGUAGES.TW]: '中文'
+};
+
+// Language to locale mapping
+export const LANGUAGE_TO_LOCALE = {
+  [LANGUAGES.EN]: 'en',
+  [LANGUAGES.ES]: 'es',
+  [LANGUAGES.PT]: 'pt',
+  [LANGUAGES.TW]: 'tw'
+};
+
+// Locale to language mapping
+export const LOCALE_TO_LANGUAGE = {
+  'en': LANGUAGES.EN,
+  'es': LANGUAGES.ES,
+  'pt': LANGUAGES.PT,
+  'tw': LANGUAGES.TW
+};
+
+// Configuration constants
+export const CONFIG = {
+  FILE_NAME: 'launcher-config.json',
+  DEFAULT_LANGUAGE: LANGUAGES.EN,
+  DEFAULT_VOICE_PACK: '',
+  DEFAULT_LOCALE: 'en'
+};
+
+// Launcher constants
+export const LAUNCHER = {
+  EXECUTABLE_NAME: 'launcher.exe',
+  UPDATE_BATCH_FILE: 'launcher-update.bat',
+  NEW_SUFFIX: '.new'
+};
+
+// Game parameter constants
+export const GAME_PARAMS = {
+  LANGUAGE_PLACEHOLDER: 'EGULANG'
+};

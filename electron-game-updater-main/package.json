@@ -1,0 +1,57 @@
+{
+  "name": "tudex-games-launcher",
+  "productName": "Tudex Games Launcher",
+  "author": "Tudex Games",
+  "description": "Tudex Games Launcher - Plataforma de distribución de juegos",
+  "version": "0.0.1",
+  "fileAssociations": {
+    "description": "Tudex Games Launcher"
+  },
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-webpack dev",
+    "build": "electron-webpack && electron-builder --w --x64"
+  },
+  "dependencies": {
+    "7zip-bin": "^5.2.0",
+    "electron-dl": "^3.5.2",
+    "node-7z": "^3.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-intl": "^7.1.14",
+    "source-map-support": "^0.5.21"
+  },
+  "devDependencies": {
+    "@babel/plugin-transform-optional-chaining": "^7.24.8",
+    "@babel/preset-react": "^7.24.7",
+    "electron": "^23.3.13",
+    "electron-builder": "^25.0.5",
+    "electron-webpack": "^2.8.2",
+    "electron-webpack-eslint": "^6.0.0",
+    "eslint-plugin-react": "^7.36.1",
+    "sass": "^1.79.3",
+    "sass-loader": "^10.1.0",
+    "webpack": "^4.47.0"
+  },
+  "build": {
+    "asar": true,
+    "extraResources": [
+      {
+        "from": "node_modules/7zip-bin",
+        "to": "7zip-bin",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "requestedExecutionLevel": "highestAvailable",
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "TudexGamesLauncher.${ext}",
+      "requestExecutionLevel": "admin"
+    }
+  }
+}

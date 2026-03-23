@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - uploads:/var/www/uploads
+    depends_on:
+      - api
+      - panel
+    restart: unless-stopped
+    networks:
+      - tudex-network
+
+  api:
+    build: ./api
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=tudex
+      - DB_PASS=tudex_secret_2026
+      - DB_NAME=tudex_launcher
+      - JWT_SECRET=tudex-jwt-secret-change-in-production
+      - UPLOAD_DIR=/app/uploads
+      - MAX_FILE_SIZE=5368709120
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - tudex-network
+
+  panel:
+    build: ./panel
+    environment:
+      - VITE_API_URL=/api
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - tudex-network
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=tudex
+      - POSTGRES_PASSWORD=tudex_secret_2026
+      - POSTGRES_DB=tudex_launcher
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tudex -d tudex_launcher"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - tudex-network
+
+volumes:
+  pgdata:
+  uploads:
+
+networks:
+  tudex-network:
+    driver: bridge
