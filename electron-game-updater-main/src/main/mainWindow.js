@@ -7,6 +7,7 @@ const createMainWindow = () => {
     webPreferences: {
       contextIsolation: false,
       nodeIntegration: true,
+      webSecurity: false,
     },
     width: 800,
     height: 600,

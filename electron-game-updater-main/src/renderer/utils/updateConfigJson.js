@@ -1,4 +1,4 @@
-const fs = require("fs");
+import fs from "fs";
 
 /**
  * Update a field in the launcher-config.json file or update an existing game.
@@ -8,7 +8,7 @@ const fs = require("fs");
  * @param {string} path - The launcher-config.json path.
  * @returns {Promise<void>}
  */
-async function updateConfigJson(field, value, path) {
+export async function updateConfigJson(field, value, path) {
   try {
     // Always read the latest config file before making changes
     const data = await fs.promises.readFile(path, "utf8");
@@ -49,5 +49,3 @@ async function updateConfigJson(field, value, path) {
     console.error("Error updating launcher-config.json:", error);
   }
 }
-
-module.exports = { updateConfigJson };

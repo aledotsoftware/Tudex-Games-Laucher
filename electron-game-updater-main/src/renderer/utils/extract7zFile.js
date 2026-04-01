@@ -1,5 +1,5 @@
-const path = require("path");
-const Seven = require("node-7z");
+import path from "path";
+import Seven from "node-7z";
 const isDevelopment = process.env.NODE_ENV !== "production";
 
 const getSevenZipBinPath = () => {
@@ -16,7 +16,7 @@ const getSevenZipBinPath = () => {
   }
 };
 
-const extract7zFile = async (archivePath, outputDir, progressCallback) => {
+export const extract7zFile = async (archivePath, outputDir, progressCallback) => {
   return new Promise((resolve, reject) => {
     const pathTo7zip = getSevenZipBinPath(); // Use the correct path
     const extractionStream = Seven.extractFull(archivePath, outputDir, {
@@ -38,5 +38,3 @@ const extract7zFile = async (archivePath, outputDir, progressCallback) => {
     });
   });
 };
-
-module.exports = { extract7zFile };

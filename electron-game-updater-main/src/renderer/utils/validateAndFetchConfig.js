@@ -1,10 +1,10 @@
-const { getConfigFileRemote } = require("./getConfigFileRemote");
-const { updateConfigJson } = require("./updateConfigJson");
-const { showError } = require("./showError");
-const { initialSetup } = require("../initialSetup");
-const { getMessages } = require("../../utils/i18n");
-const { CONFIG, LANGUAGE_TO_LOCALE } = require("../../constants");
-const fs = require('fs');
+import { getConfigFileRemote } from "./getConfigFileRemote";
+import { updateConfigJson } from "./updateConfigJson";
+import { showError } from "./showError";
+import { initialSetup } from "../initialSetup";
+import { getMessages } from "../../utils/i18n";
+import { CONFIG, LANGUAGE_TO_LOCALE } from "../../constants";
+import fs from 'fs';
 
 const validateAndFetchConfig = async (configLocal, configLocalPath, setConfigRemote, setSelectedGame, setSelectedLanguage, setCurrentLocale, setLocale, setIsInitialized, setSelectedVoicePack, isInitialized, selectedGame, currentLocale) => {
   try {
@@ -65,4 +65,4 @@ const validateAndFetchConfig = async (configLocal, configLocalPath, setConfigRem
   }
 };
 
-module.exports = { validateAndFetchConfig };
+export { validateAndFetchConfig };

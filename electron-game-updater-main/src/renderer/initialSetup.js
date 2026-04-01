@@ -1,15 +1,16 @@
-const { ipcRenderer } = require("electron");
-const { showError } = require("./utils/showError");
-const { addCacheBustingSuffix } = require("./utils/addCacheBustingSuffix");
-const { showText } = require("./utils/showText");
-const { updateConfigJson } = require("./utils/updateConfigJson");
-const { getFileNameFromUrl } = require("./utils/getFileNameFromUrl");
-const { CONFIG, LAUNCHER } = require("../constants");
+import { ipcRenderer } from "electron";
+import { showError } from "./utils/showError";
+import { addCacheBustingSuffix } from "./utils/addCacheBustingSuffix";
+import { showText } from "./utils/showText";
+import { updateConfigJson } from "./utils/updateConfigJson";
+import { getFileNameFromUrl } from "./utils/getFileNameFromUrl";
+import { CONFIG, LAUNCHER } from "../constants";
+import fs from "fs";
+import { spawn } from "child_process";
 const isDevelopment = process.env.NODE_ENV !== "production";
 
-module.exports = {
-  initialSetup: async (configLocal, configRemote) => {
-    const fs = require("fs");
+export const initialSetup = async (configLocal, configRemote) => {
+    // fs already imported
     const currentDir = ipcRenderer.sendSync("get-file-path", "");
     const configLocalPath = isDevelopment
       ? CONFIG.FILE_NAME
@@ -100,7 +101,7 @@ module.exports = {
       }
       fs.writeFileSync(replaceScriptPath, replaceScriptContent, "utf8");
 
-      const { spawn } = require("child_process");
+      // spawn already imported
       spawn(`start /min cmd.exe /C "${replaceScriptPath}"`, {
         detached: true,
         shell: true,
@@ -114,5 +115,4 @@ module.exports = {
       showError(e);
       return false;
     }
-  },
 };

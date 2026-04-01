@@ -42,8 +42,15 @@ app.get('/api/health', async (req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ error: 'Internal server error' });
+  console.error('Unhandled System Error:', err);
+  
+  // Custom structure for system errors
+  res.status(err.status || 500).json({ 
+    success: false,
+    error: err.message || 'Error Interno del Servidor',
+    code: err.code || 'INTERNAL_ERROR',
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.listen(PORT, '0.0.0.0', () => {

@@ -1,6 +1,5 @@
-// Default configuration object
 export const DEFAULT_CONFIG = {
-    updaterUrl: "https://launcher.tudexgames.com/api/config",
+    updaterUrl: "http://localhost:8080/api/config",
     launcherVer: 1,
     selectedGame: "",
     selectedLanguage: "",

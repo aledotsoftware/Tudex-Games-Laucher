@@ -1,10 +1,9 @@
-const { ipcRenderer } = require("electron");
-const { updateConfigJson } = require("./utils/updateConfigJson");
-const fs = require("fs").promises;
+import { ipcRenderer } from "electron";
+import { updateConfigJson } from "./utils/updateConfigJson";
+import { promises as fs } from "fs";
 const isDevelopment = process.env.NODE_ENV !== "production";
 
-module.exports = {
-  gamesSetup: async (game) => {
+export const gamesSetup = async (game) => {
     const currentDir = ipcRenderer.sendSync("get-file-path", "");
     const configLocalPath = isDevelopment
       ? "launcher-config.json"
@@ -32,5 +31,4 @@ module.exports = {
     };
 
     await init();
-  },
 };

@@ -1,6 +1,6 @@
-const { addCacheBustingSuffix } = require("./addCacheBustingSuffix");
+import { addCacheBustingSuffix } from "./addCacheBustingSuffix";
 
-const getConfigFileRemote = async (url) => {
+export const getConfigFileRemote = async (url) => {
     try {
         const urlWithCacheBusting = addCacheBustingSuffix(url);
         const response = await fetch(urlWithCacheBusting);
@@ -14,5 +14,3 @@ const getConfigFileRemote = async (url) => {
         return null;
     }
 };
-
-module.exports = { getConfigFileRemote };

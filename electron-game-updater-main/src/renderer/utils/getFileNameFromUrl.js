@@ -1,4 +1,4 @@
-const getFileNameFromUrl = (url) => {
+export const getFileNameFromUrl = (url) => {
   // Create a new URL object
   const myURL = new URL(url);
 
@@ -8,5 +8,3 @@ const getFileNameFromUrl = (url) => {
   // Return the file name from the pathname
   return pathname.split("/").pop();
 };
-
-module.exports = { getFileNameFromUrl };

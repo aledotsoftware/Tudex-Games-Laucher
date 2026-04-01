@@ -24,13 +24,17 @@ app.on("ready", () => {
     }
   });
 
-  ipcMain.on("show-error", (event, error) => {
+  ipcMain.on("show-error", (event, data) => {
+    const message = typeof data === 'string' ? data : data.message;
+    const title = (data && data.title) ? data.title : "Application Error";
+    
     dialog
       .showMessageBox({
         type: "error",
-        title: "Application Error",
-        message: error.toString(),
+        title: title,
+        message: message,
         buttons: ["OK"],
+        noLink: true
       })
       .then((result) => {
         if (result.response === 0) {

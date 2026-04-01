@@ -1,10 +1,10 @@
-const { showText } = require("./showText");
-const { getMessages, getLocale } = require("../../utils/i18n");
+import { showText } from "./showText";
+import { getMessages, getLocale } from "../../utils/i18n";
 
 // Store last progress for smoothing
 const lastProgress = {};
 
-const showDownloadProgress = (game, status, startTime) => {
+export const showDownloadProgress = (game, status, startTime) => {
   const locale = getLocale();
   const messages = getMessages(locale);
   const rawProgress = status.percent * 100;
@@ -98,10 +98,8 @@ const showDownloadProgress = (game, status, startTime) => {
 };
 
 // Function to reset progress smoothing for a game
-const resetProgressSmoothing = (game) => {
+export const resetProgressSmoothing = (game) => {
   if (game?.name && lastProgress[game.name]) {
     lastProgress[game.name] = { value: 0, lastUpdate: Date.now(), hasShownSpeed: false, hasShownProgress: false };
   }
 };
-
-module.exports = { showDownloadProgress, resetProgressSmoothing };

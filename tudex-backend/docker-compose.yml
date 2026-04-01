@@ -7,6 +7,7 @@ services:
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
       - uploads:/var/www/uploads
+      - ../electron-game-updater-main/dist/TudexGamesLauncher.exe:/var/www/uploads/launcher/TudexGamesLauncher.exe:ro
     depends_on:
       - api
       - panel
@@ -24,7 +25,7 @@ services:
       - DB_PASS=tudex_secret_2026
       - DB_NAME=tudex_launcher
       - JWT_SECRET=tudex-jwt-secret-change-in-production
-      - BASE_URL=https://launcher.tudexgames.com
+      - BASE_URL=http://localhost:8080
       - UPLOAD_DIR=/app/uploads
       - MAX_FILE_SIZE=5368709120
     volumes:
@@ -33,7 +34,7 @@ services:
       # Cada vez que haces `npm run build` en el proyecto Electron y
       # luego `docker compose up -d --build`, la API detecta el nuevo
       # archivo y auto-publica una nueva versión del launcher.
-      - ../electron-game-updater-main/dist/launcher.exe:/app/uploads/launcher/TudexGamesLauncher.exe:ro
+      - ../electron-game-updater-main/dist/TudexGamesLauncher.exe:/app/uploads/launcher/TudexGamesLauncher.exe:ro
     depends_on:
       db:
         condition: service_healthy

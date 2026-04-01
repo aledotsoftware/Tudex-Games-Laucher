@@ -1,9 +1,9 @@
-const { showText } = require("./showText");
+import { showText } from "./showText";
 
 // Store last progress for smoothing
 const lastExtractProgress = {};
 
-const showExtractProgress = (game, progress) => {
+export const showExtractProgress = (game, progress) => {
   // progress.percent is already a percentage (0-1), convert to 0-100
   const rawProgress = Math.min(progress.percent * 100, 100);
   
@@ -52,10 +52,8 @@ const showExtractProgress = (game, progress) => {
 };
 
 // Function to reset progress smoothing for a game
-const resetExtractProgressSmoothing = (game) => {
+export const resetExtractProgressSmoothing = (game) => {
   if (game?.name && lastExtractProgress[game.name]) {
     lastExtractProgress[game.name] = { value: 0, lastUpdate: Date.now() };
   }
 };
-
-module.exports = { showExtractProgress, resetExtractProgressSmoothing };

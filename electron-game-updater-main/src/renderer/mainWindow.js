@@ -12,10 +12,11 @@ import { handleGameClick } from "./utils/handleGameClick";
 import { handleLanguageChange } from "./utils/handleLanguageChange";
 import { handleVoicePackChange } from "./utils/handleVoicePackChange";
 import { filterVoicePackOptions, isValidVoicePackForLanguage } from "./utils/filterVoicePackOptions";
+import { gamesPatch } from "./gamesPatch.js";
 const isDevelopment = process.env.NODE_ENV !== "production";
 
 const MainWindow = () => {
-  const { gamesPatch } = require("./gamesPatch.js");
+  // Removed local require
   const [configLocal, setConfigLocal] = useState(null);
   const [configRemote, setConfigRemote] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
@@ -173,8 +174,7 @@ const MainWindow = () => {
       const game = configRemote.games?.find(g => g.name === selectedGame);
       if (game) {
         // Re-run the gamesPatch to refresh all text
-        const gamesPatchModule = require("./gamesPatch.js");
-        gamesPatchModule.gamesPatch(game, setIsUpdating, game?.maintenance);
+        gamesPatch(game, setIsUpdating, game?.maintenance);
       }
     }
   };

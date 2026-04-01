@@ -1,7 +1,7 @@
-const { gamesSetup } = require("../gamesSetup");
-const fs = require('fs');
+import { gamesSetup } from "../gamesSetup";
+import fs from 'fs';
 
-const setupGames = async (configRemote, configLocalPath, setDidFinishGamesSetup, showError) => {
+export const setupGames = async (configRemote, configLocalPath, setDidFinishGamesSetup, showError) => {
   try {
     // Populate local config with games from remote config
     const data = fs.readFileSync(configLocalPath, 'utf8');
@@ -11,6 +11,7 @@ const setupGames = async (configRemote, configLocalPath, setDidFinishGamesSetup,
     for (const remoteGame of configRemote?.games || []) {
       const existingGame = config.games?.find(g => g.name === remoteGame.name);
       if (!existingGame) {
+        if (!config.games) config.games = [];
         config.games.push({
           name: remoteGame.name,
           clientVer: 0,
@@ -30,5 +31,3 @@ const setupGames = async (configRemote, configLocalPath, setDidFinishGamesSetup,
     showError(e);
   }
 };
-
-module.exports = { setupGames };

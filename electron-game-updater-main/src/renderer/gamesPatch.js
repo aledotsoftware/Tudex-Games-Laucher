@@ -1,15 +1,15 @@
-const { ipcRenderer } = require("electron");
-const fsPromises = require("fs").promises;
-const { addCacheBustingSuffix } = require("./utils/addCacheBustingSuffix");
-const { showText } = require("./utils/showText");
-const { updateConfigJson } = require("./utils/updateConfigJson");
-const { getFileNameFromUrl } = require("./utils/getFileNameFromUrl");
-const { extract7zFile } = require("./utils/extract7zFile");
-const { showDownloadProgress, resetProgressSmoothing } = require("./utils/showDownloadProgress");
-const { showExtractProgress, resetExtractProgressSmoothing } = require("./utils/showExtractProgress");
-const { showError } = require("./utils/showError");
-const { getTranslatedText } = require("./utils/getTranslatedText");
-const { CONFIG, GAME_PARAMS } = require("../constants");
+import { ipcRenderer } from "electron";
+import { promises as fsPromises } from "fs";
+import { addCacheBustingSuffix } from "./utils/addCacheBustingSuffix";
+import { showText } from "./utils/showText";
+import { updateConfigJson } from "./utils/updateConfigJson";
+import { getFileNameFromUrl } from "./utils/getFileNameFromUrl";
+import { extract7zFile } from "./utils/extract7zFile";
+import { showDownloadProgress, resetProgressSmoothing } from "./utils/showDownloadProgress";
+import { showExtractProgress, resetExtractProgressSmoothing } from "./utils/showExtractProgress";
+import { showError } from "./utils/showError";
+import { getTranslatedText } from "./utils/getTranslatedText";
+import { CONFIG, GAME_PARAMS } from "../constants";
 const isDevelopment = process.env.NODE_ENV !== "production";
 
 // Track download states to prevent duplicates
@@ -17,8 +17,7 @@ const downloadStates = {};
 // Track start times for each game
 const downloadStartTimes = {};
 
-module.exports = {
-  gamesPatch: async (game, setIsUpdating, maintenance = false) => {
+export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
     let startTime;
     const currentDir = ipcRenderer.sendSync("get-file-path", "");
     const configLocalPath = isDevelopment
@@ -380,5 +379,4 @@ module.exports = {
     });
 
     await init();
-  },
 };
