@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Builds and Output Directories
+dist/
+**/dist/
+public_html/
+**/public_html/
+output-web/
+**/output-web/
+temp_staging/
+**/temp_staging/
+
+# Archives & Large Patch Files
+*.7z*
+*.rar
+*.zip
+*.tar.gz
+*.exe
+!src/**
+
+# Local Game Data & Staging
+tudex-backend/games/*
+!tudex-backend/games/.gitkeep
+test_v*/
+test_*.7z*
+test_versions_suite/
+r.json()*
+
+# Environment and Local Configs
+.env
+.env.local
+patch-studio-settings.json
+egu-config.json
+eguh-update-list.json
+
+# OS and Editor Files
+.DS_Store
+Thumbs.db
+*.log
+.vs/
+.idea/
+.vscode/

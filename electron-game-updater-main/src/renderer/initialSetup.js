@@ -16,16 +16,19 @@ export const initialSetup = async (configLocal, configRemote) => {
       ? CONFIG.FILE_NAME
       : `${currentDir}\\${CONFIG.FILE_NAME}`;
 
-    const launcherNew = `${getFileNameFromUrl(configRemote?.launcherUrl)}${LAUNCHER.NEW_SUFFIX}`;
-    const launcherNewPath = `${currentDir}\\${launcherNew}`;
     const replaceScriptPath = `${currentDir}\\${LAUNCHER.UPDATE_BATCH_FILE}`;
 
     const updateLauncher = () => {
       return new Promise((resolve, reject) => {
         if (
           configRemote?.launcherVer > configLocal?.launcherVer &&
+          configRemote?.launcherUrl &&
           !isDevelopment
         ) {
+          const launcherFileName = getFileNameFromUrl(configRemote.launcherUrl) || "launcher.exe";
+          const launcherNew = `${launcherFileName}${LAUNCHER.NEW_SUFFIX}`;
+          const launcherNewPath = `${currentDir}\\${launcherNew}`;
+
           showText(".initial-setup-text", "Downloading new launcher...");
 
           if (fs.existsSync(launcherNewPath)) {
@@ -47,7 +50,7 @@ export const initialSetup = async (configLocal, configRemote) => {
               configRemote.launcherVer,
               configLocalPath
             );
-            replaceExecutable();
+            replaceExecutable(launcherNew);
           });
 
           ipcRenderer.on("download error", () => {
@@ -63,7 +66,7 @@ export const initialSetup = async (configLocal, configRemote) => {
       });
     };
 
-    const replaceExecutable = () => {
+    const replaceExecutable = (launcherNew) => {
       const replaceScriptContent = `
       @echo off
       setlocal

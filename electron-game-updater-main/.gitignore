@@ -1,7 +1,17 @@
 .env
+.env.local
 /node_modules
 /dist
+/public_html
+/output-web
+/temp_staging
 /egu-config.json
 /eguh-update-list.json
 /launcher-config.json
+/patch-studio-settings.json
+*.7z*
+*.rar
+*.zip
+*.log
 .DS_Store
+Thumbs.db

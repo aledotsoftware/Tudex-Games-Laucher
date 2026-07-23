@@ -1,5 +1,5 @@
 export const DEFAULT_CONFIG = {
-    updaterUrl: "http://localhost:8080/api/config",
+    updaterUrl: "http://localhost:8081/config.json",
     launcherVer: 1,
     selectedGame: "",
     selectedLanguage: "",

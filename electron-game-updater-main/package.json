@@ -10,10 +10,18 @@
   "license": "MIT",
   "scripts": {
     "dev": "electron-webpack dev",
-    "build": "electron-webpack && electron-builder --w --x64"
+    "dev:player": "electron-webpack dev",
+    "dev:admin": "electron-webpack dev --admin",
+    "build": "electron-webpack && electron-builder --w --x64",
+    "build:player": "electron-webpack && electron-builder --w --x64 -c.portable.artifactName=TudexLauncher.exe",
+    "build:admin": "node -e \"process.env.APP_MODE='admin'\" && electron-webpack && electron-builder --w --x64 -c.portable.artifactName=TudexPatchStudio.exe",
+    "build-patch": "node tools/patch-builder.js",
+    "build-launcher": "node tools/launcher-builder.js",
+    "test-patches": "node tools/test-10-versions.js"
   },
   "dependencies": {
     "7zip-bin": "^5.2.0",
+    "basic-ftp": "^6.0.1",
     "electron-dl": "^3.5.2",
     "node-7z": "^3.0.0",
     "react": "^18.3.1",

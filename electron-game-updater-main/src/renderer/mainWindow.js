@@ -28,6 +28,11 @@ const MainWindow = () => {
   const [currentLocale, setCurrentLocale] = useState(getLocale());
   const [isInitialized, setIsInitialized] = useState(false);
 
+  const currentDir = ipcRenderer.sendSync("get-file-path", "");
+  const configLocalPath = isDevelopment
+    ? CONFIG.FILE_NAME
+    : `${currentDir}\\${CONFIG.FILE_NAME}`;
+
   useEffect(() => {
     const sevenZipBinPath = getSevenZipBinPath();
     if (!sevenZipBinPath) {
@@ -178,11 +183,6 @@ const MainWindow = () => {
       }
     }
   };
-
-  const currentDir = ipcRenderer.sendSync("get-file-path", "");
-  const configLocalPath = isDevelopment
-    ? CONFIG.FILE_NAME
-    : `${currentDir}\\${CONFIG.FILE_NAME}`;
 
   const handleGameClickAsync = async (game) => {
     await handleGameClick(game, isUpdating, currentLocale, getMessages, setSelectedGame, setSelectedVoicePack, configLocalPath);

@@ -1,10 +1,9 @@
 export const getFileNameFromUrl = (url) => {
-  // Create a new URL object
-  const myURL = new URL(url);
-
-  // Get the pathname part of the URL
-  const pathname = myURL.pathname;
-
-  // Return the file name from the pathname
-  return pathname.split("/").pop();
+  if (!url) return "";
+  try {
+    const myURL = new URL(url);
+    return myURL.pathname.split("/").pop();
+  } catch (e) {
+    return String(url).split("/").pop().split("?")[0];
+  }
 };

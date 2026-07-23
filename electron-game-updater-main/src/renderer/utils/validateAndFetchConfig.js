@@ -8,10 +8,10 @@ import fs from 'fs';
 
 const validateAndFetchConfig = async (configLocal, configLocalPath, setConfigRemote, setSelectedGame, setSelectedLanguage, setCurrentLocale, setLocale, setIsInitialized, setSelectedVoicePack, isInitialized, selectedGame, currentLocale) => {
   try {
-    const remoteConfig = await getConfigFileRemote(configLocal.updaterUrl);
-    if (!remoteConfig || remoteConfig.length === 0) {
-      showError(getMessages(currentLocale).errorFetchingRemoteConfig);
-      return;
+    let remoteConfig = await getConfigFileRemote(configLocal?.updaterUrl);
+    if (!remoteConfig || (!Array.isArray(remoteConfig) && (!remoteConfig.games || !Array.isArray(remoteConfig.games)))) {
+      console.warn("Could not fetch remote config, falling back to local configuration.");
+      remoteConfig = configLocal || { games: [] };
     }
 
     setConfigRemote(remoteConfig);

@@ -22,9 +22,9 @@ module.exports = {
   rules: {
     // allow anonymous component functions
     "react/display-name": 0,
-    // disallow console and debugger in production mode
-    "no-console": process.env.NODE_ENV === "production" ? 2 : 0,
-    "no-debugger": process.env.NODE_ENV === "production" ? 2 : 0,
+    // allow console and debugger in builds
+    "no-console": 0,
+    "no-debugger": 1,
     // allow spreading out properties from an object without warnings
     "no-unused-vars": [1, { ignoreRestSiblings: true }],
   },

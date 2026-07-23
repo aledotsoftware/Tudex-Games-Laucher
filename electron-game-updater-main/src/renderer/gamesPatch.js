@@ -1,5 +1,5 @@
 import { ipcRenderer } from "electron";
-import { promises as fsPromises } from "fs";
+import fs, { promises as fsPromises } from "fs";
 import { addCacheBustingSuffix } from "./utils/addCacheBustingSuffix";
 import { showText } from "./utils/showText";
 import { updateConfigJson } from "./utils/updateConfigJson";
@@ -73,15 +73,18 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
     };
 
     const init = async () => {
+      const gameFolder = isDevelopment
+        ? game.name
+        : `${currentDir}\\${game.name}`;
+      const gameFolderExists = fs.existsSync(gameFolder);
+
       if (
-        gameLocal?.clientVer === 0 &&
-        game?.clientVer > gameLocal?.clientVer
+        !gameFolderExists ||
+        gameLocal?.clientVer === 0 ||
+        gameLocal?.clientVer == null
       ) {
         waitForInstallClick();
-      } else if (
-        gameLocal?.clientVer > 0 &&
-        game?.clientVer > gameLocal?.clientVer
-      ) {
+      } else if (game?.clientVer > gameLocal?.clientVer) {
         waitForClientUpdateClick();
       } else if (game?.patchUrls?.length > gameLocal?.patchVer) {
         waitForPatchClick();
@@ -91,14 +94,12 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
     };
 
     const updateClient = async () => {
-      // Check if download is already in progress
       if (downloadStates[`${game.name}_client`]) {
         return;
       }
       
       downloadStates[`${game.name}_client`] = true;
       setIsUpdating(true);
-      // Reset progress smoothing for clean start
       resetProgressSmoothing(game);
       resetExtractProgressSmoothing(game);
       try {
@@ -109,70 +110,112 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
         });
       }
 
-      const clientZipPath = `${currentDir}\\${game?.name}\\${getFileNameFromUrl(
-        game.clientUrl
-      )}`;
-
-      try {
-        await fsPromises.access(clientZipPath);
-        await fsPromises.unlink(clientZipPath); // Delete the file if it exists
-      } catch (error) {
-        // File doesn't exist, continue
+      // Collect all volume chunk URLs (or single URL if not split)
+      let chunkUrls = [];
+      if (game?.clientChunks && Array.isArray(game.clientChunks) && game.clientChunks.length > 0) {
+        chunkUrls = game.clientChunks;
+      } else if (game?.clientUrl) {
+        chunkUrls = [game.clientUrl];
       }
 
-      startTime = Date.now();
-      downloadStartTimes[`${game.name}_client`] = startTime;
-      ipcRenderer.send("download", {
-        url: addCacheBustingSuffix(game?.clientUrl),
-        options: {
-          directory: `${currentDir}\\${game?.name}`,
-          filename: getFileNameFromUrl(game?.clientUrl),
-          step: "client",
-        },
-      });
+      if (chunkUrls.length === 0) {
+        showError(getTranslatedText("errorDownloadingFile"));
+        setIsUpdating(false);
+        downloadStates[`${game.name}_client`] = false;
+        return;
+      }
 
-      // Use once to prevent multiple listeners
-      ipcRenderer.once("download client complete", async () => {
-        showText(`.txt-status.${game?.name}`, getTranslatedText("extractingClient"));
-        
-        try {
-          await extract7zFile(
-            clientZipPath,
-            `${currentDir}\\${game?.name}`,
-            (progress) => {
-              showExtractProgress(game, progress);
-            }
-          );
-          
-          // Clean up the downloaded file
+      let currentChunkIndex = 0;
+
+      const processChunkDownload = async () => {
+        if (currentChunkIndex >= chunkUrls.length) {
+          // All volume chunks downloaded successfully, now extract
+          showText(`.txt-status.${game?.name}`, getTranslatedText("extractingClient"));
+          const firstChunkFileName = getFileNameFromUrl(chunkUrls[0]);
+          const firstChunkPath = `${currentDir}\\${game?.name}\\${firstChunkFileName}`;
+
           try {
-            await fsPromises.access(clientZipPath);
-            await fsPromises.unlink(clientZipPath);
+            await extract7zFile(
+              firstChunkPath,
+              `${currentDir}\\${game?.name}`,
+              (progress) => {
+                showExtractProgress(game, progress);
+              }
+            );
+
+            // Clean up downloaded archive volume files
+            for (const url of chunkUrls) {
+              const fn = getFileNameFromUrl(url);
+              const p = `${currentDir}\\${game?.name}\\${fn}`;
+              try {
+                await fsPromises.access(p);
+                await fsPromises.unlink(p);
+              } catch (e) {
+                // Ignore if chunk file is missing
+              }
+            }
+
+            await updateConfigJson(
+              "games",
+              { name: game.name, clientVer: game.clientVer, patchVer: 0 },
+              configLocalPath
+            );
+
+            if (game?.patchUrls?.length > gameLocal?.patchVer) {
+              handlePatches();
+            } else {
+              finish();
+            }
           } catch (error) {
-            // File doesn't exist, continue
+            console.error("Extraction error:", error);
+            showError(getTranslatedText("errorDownloadingFile"));
+            setIsUpdating(false);
+          } finally {
+            downloadStates[`${game.name}_client`] = false;
+            delete downloadStartTimes[`${game.name}_client`];
           }
-          
-          await updateConfigJson(
-            "games",
-            { name: game.name, clientVer: game.clientVer, patchVer: 0 },
-            configLocalPath
-          );
-          
-          if (game?.patchUrls?.length > gameLocal?.patchVer) {
-            handlePatches();
-          } else {
-            finish();
-          }
-        } catch (error) {
-          console.error("Extraction error:", error);
-          showError(getTranslatedText("errorDownloadingFile"));
-          setIsUpdating(false);
-        } finally {
-          // Clear download state and start time
-          downloadStates[`${game.name}_client`] = false;
-          delete downloadStartTimes[`${game.name}_client`];
+          return;
         }
-      });
+
+        const chunkUrl = chunkUrls[currentChunkIndex];
+        const chunkFileName = getFileNameFromUrl(chunkUrl);
+        const chunkFilePath = `${currentDir}\\${game?.name}\\${chunkFileName}`;
+
+        try {
+          await fsPromises.access(chunkFilePath);
+          await fsPromises.unlink(chunkFilePath);
+        } catch (error) {
+          // Ignore if chunk file is missing
+        }
+
+        if (chunkUrls.length > 1) {
+          showText(
+            `.txt-status.${game?.name}`,
+            `${getTranslatedText("downloadingClient")} (${currentChunkIndex + 1}/${chunkUrls.length})`
+          );
+        } else {
+          showText(`.txt-status.${game?.name}`, getTranslatedText("downloadingClient"));
+        }
+
+        startTime = Date.now();
+        downloadStartTimes[`${game.name}_client`] = startTime;
+
+        ipcRenderer.send("download", {
+          url: addCacheBustingSuffix(chunkUrl),
+          options: {
+            directory: `${currentDir}\\${game?.name}`,
+            filename: chunkFileName,
+            step: "client",
+          },
+        });
+
+        ipcRenderer.once("download client complete", () => {
+          currentChunkIndex++;
+          processChunkDownload();
+        });
+      };
+
+      processChunkDownload();
     };
 
     const handlePatches = async () => {
@@ -380,3 +423,26 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
 
     await init();
 };
+
+export const repairGame = async (game, setIsUpdating) => {
+    const currentDir = ipcRenderer.sendSync("get-file-path", "");
+    const configLocalPath = isDevelopment
+      ? CONFIG.FILE_NAME
+      : `${currentDir}\\${CONFIG.FILE_NAME}`;
+
+    await updateConfigJson(
+      "games",
+      { name: game.name, clientVer: 0, patchVer: 0 },
+      configLocalPath
+    );
+
+    const gameFolder = `${currentDir}\\${game.name}`;
+    try {
+      await fsPromises.rm(gameFolder, { recursive: true, force: true });
+    } catch (e) {
+      // Ignore if folder cleanup fails
+    }
+
+    await gamesPatch(game, setIsUpdating);
+};
+
