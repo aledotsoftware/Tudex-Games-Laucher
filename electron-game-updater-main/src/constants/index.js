@@ -1,5 +1,5 @@
 export const DEFAULT_CONFIG = {
-    updaterUrl: "http://localhost:8081/config.json",
+    updaterUrl: "https://updates.tudexnetworks.com/tudexgames/config.json",
     launcherVer: 1,
     selectedGame: "",
     selectedLanguage: "",
@@ -41,9 +41,9 @@ export const LOCALE_TO_LANGUAGE = {
 // Configuration constants
 export const CONFIG = {
   FILE_NAME: 'launcher-config.json',
-  DEFAULT_LANGUAGE: LANGUAGES.EN,
+  DEFAULT_LANGUAGE: LANGUAGES.ES,
   DEFAULT_VOICE_PACK: '',
-  DEFAULT_LOCALE: 'en'
+  DEFAULT_LOCALE: 'es'
 };
 
 // Launcher constants

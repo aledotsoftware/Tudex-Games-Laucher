@@ -1,5 +1,6 @@
 import { ipcRenderer } from "electron";
 import fs, { promises as fsPromises } from "fs";
+import path from "path";
 import { addCacheBustingSuffix } from "./utils/addCacheBustingSuffix";
 import { showText } from "./utils/showText";
 import { updateConfigJson } from "./utils/updateConfigJson";
@@ -93,12 +94,48 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
       }
     };
 
+    let isPaused = false;
+    let activeClientListener = null;
+    let processChunkDownload = null;
+
+    const pauseClientDownload = () => {
+      isPaused = true;
+      downloadStates[`${game.name}_client`] = false;
+      if (activeClientListener) {
+        ipcRenderer.removeListener("download client complete", activeClientListener);
+        activeClientListener = null;
+      }
+      disabledButton.style.display = "none";
+      startButton.style.display = "block";
+      startButton.removeEventListener("click", pauseClientDownload);
+      startButton.addEventListener("click", resumeClientDownload);
+      showText(`.btn-start.${game?.name}`, getTranslatedText("resume"));
+      showText(`.txt-status.${game?.name}`, getTranslatedText("downloadPaused"));
+      showText(`.txt-download-speed.${game?.name}`, "");
+      showText(`.txt-time-remaining.${game?.name}`, "");
+    };
+
+    const resumeClientDownload = () => {
+      if (downloadStates[`${game.name}_client`]) return;
+      isPaused = false;
+      downloadStates[`${game.name}_client`] = true;
+      setIsUpdating(true);
+      disabledButton.style.display = "none";
+      startButton.style.display = "block";
+      startButton.removeEventListener("click", resumeClientDownload);
+      startButton.addEventListener("click", pauseClientDownload);
+      showText(`.btn-start.${game?.name}`, getTranslatedText("pause"));
+      showText(`.txt-status.${game?.name}`, getTranslatedText("downloadingClient"));
+      processChunkDownload();
+    };
+
     const updateClient = async () => {
       if (downloadStates[`${game.name}_client`]) {
         return;
       }
       
       downloadStates[`${game.name}_client`] = true;
+      isPaused = false;
       setIsUpdating(true);
       resetProgressSmoothing(game);
       resetExtractProgressSmoothing(game);
@@ -127,9 +164,15 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
 
       let currentChunkIndex = 0;
 
-      const processChunkDownload = async () => {
+      processChunkDownload = async () => {
+        if (isPaused) return;
+
         if (currentChunkIndex >= chunkUrls.length) {
-          // All volume chunks downloaded successfully, now extract
+          // All volume chunks downloaded successfully, clean up listeners & start extract
+          startButton.removeEventListener("click", pauseClientDownload);
+          startButton.removeEventListener("click", resumeClientDownload);
+          disabledButton.style.display = "block";
+
           showText(`.txt-status.${game?.name}`, getTranslatedText("extractingClient"));
           const firstChunkFileName = getFileNameFromUrl(chunkUrls[0]);
           const firstChunkPath = `${currentDir}\\${game?.name}\\${firstChunkFileName}`;
@@ -177,15 +220,32 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
           return;
         }
 
+        // Show Pause button on action button
+        disabledButton.style.display = "none";
+        startButton.style.display = "block";
+        startButton.removeEventListener("click", handleInstallClick);
+        startButton.removeEventListener("click", resumeClientDownload);
+        startButton.addEventListener("click", pauseClientDownload);
+        showText(`.btn-start.${game?.name}`, getTranslatedText("pause"));
+
         const chunkUrl = chunkUrls[currentChunkIndex];
         const chunkFileName = getFileNameFromUrl(chunkUrl);
         const chunkFilePath = `${currentDir}\\${game?.name}\\${chunkFileName}`;
 
+        // Check if chunk file already exists (e.g. completed in previous session or before pause)
         try {
-          await fsPromises.access(chunkFilePath);
-          await fsPromises.unlink(chunkFilePath);
+          if (fs.existsSync(chunkFilePath)) {
+            const stat = await fsPromises.stat(chunkFilePath);
+            // Skip completed non-last volume chunks if size > 1MB
+            if (stat.size > 1048576 && currentChunkIndex < chunkUrls.length - 1) {
+              currentChunkIndex++;
+              return processChunkDownload();
+            } else {
+              await fsPromises.unlink(chunkFilePath);
+            }
+          }
         } catch (error) {
-          // Ignore if chunk file is missing
+          // Ignore
         }
 
         if (chunkUrls.length > 1) {
@@ -209,10 +269,18 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
           },
         });
 
-        ipcRenderer.once("download client complete", () => {
-          currentChunkIndex++;
-          processChunkDownload();
-        });
+        activeClientListener = () => {
+          if (activeClientListener) {
+            ipcRenderer.removeListener("download client complete", activeClientListener);
+            activeClientListener = null;
+          }
+          if (!isPaused) {
+            currentChunkIndex++;
+            processChunkDownload();
+          }
+        };
+
+        ipcRenderer.once("download client complete", activeClientListener);
       };
 
       processChunkDownload();
@@ -351,6 +419,54 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
       }
     };
 
+    const isGameValid = () => {
+      const gameFolder = isDevelopment
+        ? game.name
+        : `${currentDir}\\${game.name}`;
+      if (!fs.existsSync(gameFolder)) return false;
+
+      try {
+        const files = fs.readdirSync(gameFolder);
+        if (!files || files.length === 0) return false;
+
+        if (game?.startCmd) {
+          const rawCmd = game.startCmd.trim();
+          const match = rawCmd.match(/^"?([^"\s]+\.exe)"?/i) || rawCmd.split(" ");
+          const exeName = match ? (match[1] || match[0]) : null;
+          if (exeName) {
+            const fullExePath = path.join(gameFolder, exeName);
+            if (!fs.existsSync(fullExePath)) {
+              console.warn("Game executable missing:", fullExePath);
+              return false;
+            }
+            const stat = fs.statSync(fullExePath);
+            if (stat.size === 0) return false;
+          }
+        }
+
+        // Integrity verification against release manifest
+        if (game?.manifest && typeof game.manifest === "object") {
+          for (const [relPath, info] of Object.entries(game.manifest)) {
+            const targetPath = path.join(gameFolder, relPath);
+            if (!fs.existsSync(targetPath)) {
+              console.warn("Integrity check failed: missing file", relPath);
+              return false;
+            }
+            if (info?.size) {
+              const stat = fs.statSync(targetPath);
+              if (stat.size !== info.size) {
+                console.warn("Integrity check failed: modified file size", relPath);
+                return false;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        return false;
+      }
+      return true;
+    };
+
     const finish = () => {
       setIsUpdating(false);
       disabledButton.style.setProperty("display", "none");
@@ -359,50 +475,68 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
         showText(`.txt-status.${game?.name}`, getTranslatedText("underMaintenance"));
         showText(`.btn-start.${game?.name}`, getTranslatedText("underMaintenance"));
         showText(`.btn-start.disabled.${game?.name}`, getTranslatedText("underMaintenance"));
+      } else if (!isGameValid()) {
+        showText(`.txt-status.${game?.name}`, getTranslatedText("installationCorrupted"));
+        showText(`.btn-start.${game?.name}`, getTranslatedText("repair"));
+        showText(`.btn-start.disabled.${game?.name}`, getTranslatedText("repair"));
+        showText(`.txt-progress.${game?.name}`, "");
+        document
+          .querySelector(`.total-bar.${game?.name}`)
+          .style.setProperty("width", "0%");
+
+        startButton.removeEventListener("click", handleInstallClick);
+        startButton.removeEventListener("click", handlePatchClick);
+        startButton.addEventListener("click", () => repairGame(game, setIsUpdating));
       } else {
         showText(`.txt-status.${game?.name}`, getTranslatedText("gameReady"));
         showText(`.btn-start.${game?.name}`, getTranslatedText("play"));
         showText(`.btn-start.disabled.${game?.name}`, getTranslatedText("play"));
-      }
-      
-      showText(`.txt-progress.${game?.name}`, "");
-      document
-        .querySelector(`.total-bar.${game?.name}`)
-        .style.setProperty("width", "100%");
-      startButton.removeEventListener("click", handleInstallClick);
-      startButton.removeEventListener("click", handlePatchClick);
-      startButton.addEventListener("click", async () => {
-        const { spawn } = require("child_process");
         
-        // Get the selected language from the config
-        const configLocalPath = isDevelopment
-          ? CONFIG.FILE_NAME
-          : `${currentDir}\\${CONFIG.FILE_NAME}`;
-        const configData = await fsPromises.readFile(configLocalPath, "utf8");
-        const config = JSON.parse(configData);
-        const selectedLanguage = config.selectedLanguage || CONFIG.DEFAULT_LANGUAGE;
-        
-        // Get the selected voice pack from the current game's config
-        const currentGame = config.games?.find(g => g.name === game.name);
-        const selectedVoicePack = currentGame?.selectedVoicePack || CONFIG.DEFAULT_VOICE_PACK;
-        
-        // Replace language placeholder in startCmd if it exists
-        let finalStartCmd = game.startCmd;
-        if (game.startCmd && game.startCmd.includes(GAME_PARAMS.LANGUAGE_PLACEHOLDER)) {
-          let languageParam = selectedLanguage;
-          if (selectedVoicePack && selectedVoicePack !== '') {
-            languageParam = `${selectedLanguage}_${selectedVoicePack}`;
+        showText(`.txt-progress.${game?.name}`, "");
+        document
+          .querySelector(`.total-bar.${game?.name}`)
+          .style.setProperty("width", "100%");
+        startButton.removeEventListener("click", handleInstallClick);
+        startButton.removeEventListener("click", handlePatchClick);
+        startButton.addEventListener("click", async () => {
+          if (!isGameValid()) {
+            showError(getTranslatedText("errorLaunching"));
+            await repairGame(game, setIsUpdating);
+            return;
           }
-          finalStartCmd = game.startCmd.replace(GAME_PARAMS.LANGUAGE_PLACEHOLDER, languageParam);
-        }
-        
-        spawn(finalStartCmd, {
-          cwd: currentDir + `\\${game.name}\\`,
-          detached: true,
-          shell: true,
+
+          const { spawn } = require("child_process");
+          
+          // Get the selected language from the config
+          const configLocalPath = isDevelopment
+            ? CONFIG.FILE_NAME
+            : `${currentDir}\\${CONFIG.FILE_NAME}`;
+          const configData = await fsPromises.readFile(configLocalPath, "utf8");
+          const config = JSON.parse(configData);
+          const selectedLanguage = config.selectedLanguage || CONFIG.DEFAULT_LANGUAGE;
+          
+          // Get the selected voice pack from the current game's config
+          const currentGame = config.games?.find(g => g.name === game.name);
+          const selectedVoicePack = currentGame?.selectedVoicePack || CONFIG.DEFAULT_VOICE_PACK;
+          
+          // Replace language placeholder in startCmd if it exists
+          let finalStartCmd = game.startCmd;
+          if (game.startCmd && game.startCmd.includes(GAME_PARAMS.LANGUAGE_PLACEHOLDER)) {
+            let languageParam = selectedLanguage;
+            if (selectedVoicePack && selectedVoicePack !== '') {
+              languageParam = `${selectedLanguage}_${selectedVoicePack}`;
+            }
+            finalStartCmd = game.startCmd.replace(GAME_PARAMS.LANGUAGE_PLACEHOLDER, languageParam);
+          }
+          
+          spawn(finalStartCmd, {
+            cwd: currentDir + `\\${game.name}\\`,
+            detached: true,
+            shell: true,
+          });
+          ipcRenderer.send("close-app");
         });
-        ipcRenderer.send("close-app");
-      });
+      }
     };
 
     // Remove any existing listeners first to prevent duplicates

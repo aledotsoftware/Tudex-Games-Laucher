@@ -9,7 +9,7 @@ export const AdminStudioApp = () => {
   const [version, setVersion] = useState(1);
   const [fromVersion, setFromVersion] = useState(0);
   const [volumeSize, setVolumeSize] = useState("50m");
-  const [baseUrl, setBaseUrl] = useState("http://localhost:8081");
+  const [baseUrl, setBaseUrl] = useState("https://updates.tudexnetworks.com/tudexgames");
   const [outDir, setOutDir] = useState("");
   const [isBuilding, setIsBuilding] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);

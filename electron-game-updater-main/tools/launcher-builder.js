@@ -6,7 +6,7 @@ function parseArgs() {
     const options = {
         version: null,
         exePath: null,
-        baseUrl: 'http://localhost:8081',
+        baseUrl: 'https://updates.tudexnetworks.com/tudexgames',
         outDir: path.resolve(process.cwd(), 'public_html')
     };
 
@@ -78,6 +78,13 @@ async function main() {
     fs.copyFileSync(options.exePath, targetPath);
 
     const configPath = path.join(options.outDir, 'config.json');
+    const configCandidates = [
+        configPath,
+        path.resolve(process.cwd(), '..', 'tudex-backend', 'config.json'),
+        path.resolve(process.cwd(), 'tudex-backend', 'config.json'),
+        path.resolve(process.cwd(), 'public_html', 'config.json')
+    ];
+
     let webConfig = {
         updaterUrl: `${options.baseUrl}/config.json`,
         launcherVer: 1,
@@ -87,11 +94,20 @@ async function main() {
         games: []
     };
 
-    if (fs.existsSync(configPath)) {
-        try {
-            webConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        } catch (e) {
-            console.warn('Existing config.json invalid, creating new configuration.');
+    for (const cand of configCandidates) {
+        if (fs.existsSync(cand)) {
+            try {
+                const parsed = JSON.parse(fs.readFileSync(cand, 'utf8'));
+                if (parsed && Array.isArray(parsed.games) && parsed.games.length > 0) {
+                    webConfig = parsed;
+                    console.log(`Preserving existing games configuration from: ${cand}`);
+                    break;
+                } else if (parsed && parsed.launcherVer) {
+                    webConfig = parsed;
+                }
+            } catch (e) {
+                // Continue searching
+            }
         }
     }
 
@@ -99,7 +115,35 @@ async function main() {
     webConfig.launcherUrl = `${options.baseUrl}/launcher/${fileName}`;
     webConfig.updaterUrl = `${options.baseUrl}/config.json`;
 
+    // Ensure all game URLs match baseUrl and include proper /games/ subpath
+    if (webConfig.games && Array.isArray(webConfig.games)) {
+        webConfig.games.forEach(game => {
+            if (game.clientUrl) {
+                game.clientUrl = game.clientUrl
+                    .replace(/^http:\/\/localhost:\d+/i, options.baseUrl)
+                    .replace(/\/tudexgames\/neo\//g, '/tudexgames/games/neo/');
+            }
+            if (game.clientChunks && Array.isArray(game.clientChunks)) {
+                game.clientChunks = game.clientChunks.map(url =>
+                    url.replace(/^http:\/\/localhost:\d+/i, options.baseUrl)
+                       .replace(/\/tudexgames\/neo\//g, '/tudexgames/games/neo/')
+                );
+            }
+            if (game.patchUrls && Array.isArray(game.patchUrls)) {
+                game.patchUrls = game.patchUrls.map(url =>
+                    url.replace(/^http:\/\/localhost:\d+/i, options.baseUrl)
+                       .replace(/\/tudexgames\/neo\//g, '/tudexgames/games/neo/')
+                );
+            }
+        });
+    }
+
     fs.writeFileSync(configPath, JSON.stringify(webConfig, null, 4), 'utf8');
+    
+    const rootBackendConfig = path.resolve(process.cwd(), '..', 'tudex-backend', 'config.json');
+    if (fs.existsSync(rootBackendConfig)) {
+        fs.writeFileSync(rootBackendConfig, JSON.stringify(webConfig, null, 4), 'utf8');
+    }
 
     console.log(`
 =====================================================

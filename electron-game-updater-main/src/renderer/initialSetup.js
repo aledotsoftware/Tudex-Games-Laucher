@@ -1,22 +1,25 @@
 import { ipcRenderer } from "electron";
+import path from "path";
+import fs from "fs";
+import { spawn } from "child_process";
 import { showError } from "./utils/showError";
 import { addCacheBustingSuffix } from "./utils/addCacheBustingSuffix";
 import { showText } from "./utils/showText";
 import { updateConfigJson } from "./utils/updateConfigJson";
 import { getFileNameFromUrl } from "./utils/getFileNameFromUrl";
+import { getTranslatedText } from "./utils/getTranslatedText";
 import { CONFIG, LAUNCHER } from "../constants";
-import fs from "fs";
-import { spawn } from "child_process";
+
 const isDevelopment = process.env.NODE_ENV !== "production";
 
 export const initialSetup = async (configLocal, configRemote) => {
-    // fs already imported
     const currentDir = ipcRenderer.sendSync("get-file-path", "");
     const configLocalPath = isDevelopment
       ? CONFIG.FILE_NAME
       : `${currentDir}\\${CONFIG.FILE_NAME}`;
 
     const replaceScriptPath = `${currentDir}\\${LAUNCHER.UPDATE_BATCH_FILE}`;
+    const currentExeName = path.basename(process.execPath);
 
     const updateLauncher = () => {
       return new Promise((resolve, reject) => {
@@ -29,11 +32,26 @@ export const initialSetup = async (configLocal, configRemote) => {
           const launcherNew = `${launcherFileName}${LAUNCHER.NEW_SUFFIX}`;
           const launcherNewPath = `${currentDir}\\${launcherNew}`;
 
-          showText(".initial-setup-text", "Downloading new launcher...");
+          const initialText = `${getTranslatedText("downloadingLauncher")}... (0%)`;
+          showText(".initial-setup-text", initialText);
 
           if (fs.existsSync(launcherNewPath)) {
-            fs.unlinkSync(launcherNewPath);
+            try { fs.unlinkSync(launcherNewPath); } catch (e) { /* ignore */ }
           }
+
+          const progressHandler = (event, status) => {
+            if (status && status.percent !== undefined) {
+              const percent = Math.round(status.percent * 100);
+              const transferredMB = ((status.transferredBytes || 0) / (1024 * 1024)).toFixed(1);
+              const totalMB = ((status.totalBytes || 0) / (1024 * 1024)).toFixed(1);
+              showText(
+                ".initial-setup-text",
+                `${getTranslatedText("downloadingLauncher")} (${percent}%) - ${transferredMB}MB / ${totalMB}MB`
+              );
+            }
+          };
+
+          ipcRenderer.on("download progress", progressHandler);
 
           ipcRenderer.send("download", {
             url: addCacheBustingSuffix(configRemote?.launcherUrl),
@@ -45,6 +63,7 @@ export const initialSetup = async (configLocal, configRemote) => {
           });
 
           ipcRenderer.on("download launcher complete", () => {
+            ipcRenderer.removeListener("download progress", progressHandler);
             updateConfigJson(
               "launcherVer",
               configRemote.launcherVer,
@@ -54,10 +73,11 @@ export const initialSetup = async (configLocal, configRemote) => {
           });
 
           ipcRenderer.on("download error", () => {
-            reject("Error while downloading new launcher");
+            ipcRenderer.removeListener("download progress", progressHandler);
+            reject(getTranslatedText("errorDownloadingFile"));
           });
         } else {
-          showText(".initial-setup-text", "Launcher already updated");
+          showText(".initial-setup-text", getTranslatedText("launcherUpdated"));
           document
             .querySelector(".initial-setup")
             .style.setProperty("display", "none");
@@ -67,44 +87,40 @@ export const initialSetup = async (configLocal, configRemote) => {
     };
 
     const replaceExecutable = (launcherNew) => {
+      const targetExeName = currentExeName && currentExeName.endsWith(".exe") 
+        ? currentExeName 
+        : LAUNCHER.EXECUTABLE_NAME;
+
       const replaceScriptContent = `
       @echo off
       setlocal
       set currentDir=%~dp0
-      set launcherExe=%currentDir%${LAUNCHER.EXECUTABLE_NAME}
+      set launcherExe=%currentDir%${targetExeName}
       set newLauncher=%currentDir%${launcherNew}
     
-      :: Kill the running launcher
-      taskkill /IM ${LAUNCHER.EXECUTABLE_NAME} /F >nul 2>&1
+      timeout /T 1 /NOBREAK >NUL
+
+      taskkill /IM "${targetExeName}" /F >nul 2>&1
     
-      :: Wait for the launcher to close
       :waitLoop
-      tasklist /FI "IMAGENAME eq ${LAUNCHER.EXECUTABLE_NAME}" 2>NUL | find /I "${LAUNCHER.EXECUTABLE_NAME}" >NUL
+      tasklist /FI "IMAGENAME eq ${targetExeName}" 2>NUL | find /I "${targetExeName}" >NUL
       if not errorlevel 1 (
           timeout /T 1 /NOBREAK >NUL
           goto waitLoop
       )
     
-      :: Delete the old launcher executable
       del /F /Q "%launcherExe%" >nul 2>&1
-    
-      :: Rename the new launcher to ${LAUNCHER.EXECUTABLE_NAME}
-      ren "%newLauncher%" "${LAUNCHER.EXECUTABLE_NAME}"
-    
-      :: Start the new launcher
+      move /Y "%newLauncher%" "%launcherExe%" >nul 2>&1
       start "" "%launcherExe%" >nul 2>&1
-    
-      :: Clean up the batch file
       del /F "%~f0" >nul 2>&1
       exit /b
       `;
 
       if (fs.existsSync(replaceScriptPath)) {
-        fs.unlinkSync(replaceScriptPath);
+        try { fs.unlinkSync(replaceScriptPath); } catch (e) { /* ignore */ }
       }
       fs.writeFileSync(replaceScriptPath, replaceScriptContent, "utf8");
 
-      // spawn already imported
       spawn(`start /min cmd.exe /C "${replaceScriptPath}"`, {
         detached: true,
         shell: true,

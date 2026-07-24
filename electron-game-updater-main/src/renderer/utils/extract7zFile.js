@@ -1,20 +1,26 @@
 import path from "path";
 import fs from "fs";
 import Seven from "node-7z";
-const isDevelopment = process.env.NODE_ENV !== "production";
 
 const getSevenZipBinPath = () => {
-  if (!isDevelopment) {
-    return path.join(
-      process.resourcesPath,
-      "7zip-bin",
-      "win",
-      "x64",
-      "7za.exe"
-    );
-  } else {
-    return require("7zip-bin").path7za;
+  const possiblePaths = [
+    (() => {
+      try { return require("7zip-bin").path7za; } catch (e) { return null; }
+    })(),
+    path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "7zip-bin", "win", "x64", "7za.exe"),
+    path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "7zip-bin", "win", "ia32", "7za.exe"),
+    path.join(process.resourcesPath, "7zip-bin", "win", "x64", "7za.exe"),
+    path.join(process.resourcesPath, "7za.exe"),
+    path.join(process.cwd(), "7za.exe"),
+    path.join(process.cwd(), "resources", "7za.exe"),
+    "7za.exe"
+  ];
+  for (const p of possiblePaths) {
+    if (p && fs.existsSync(p)) {
+      return p;
+    }
   }
+  try { return require("7zip-bin").path7za; } catch (e) { return "7za.exe"; }
 };
 
 export const extract7zFile = async (archivePath, outputDir, progressCallback) => {

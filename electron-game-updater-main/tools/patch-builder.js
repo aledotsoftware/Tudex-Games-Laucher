@@ -15,7 +15,7 @@ function parseArgs() {
         oldDir: null,
         version: 1,
         fromVersion: null,
-        baseUrl: 'http://localhost:8081',
+        baseUrl: 'https://updates.tudexnetworks.com/tudexgames',
         outDir: path.resolve(process.cwd(), 'public_html'),
         volumeSize: '50m'
     };
@@ -312,10 +312,15 @@ async function main() {
         });
         gameConfig.patchVer = gameConfig.patchUrls.length;
     } else {
-        gameConfig.clientVer = options.version;
-        gameConfig.clientUrl = chunkUrls[0];
-        gameConfig.clientChunks = chunkUrls;
-    }
+    // Generate manifest checksums for integrity verification
+    const manifest = {};
+    newFiles.forEach(f => {
+        manifest[f.relativePath] = {
+            size: f.size,
+            hash: getFileHash(f.fullPath)
+        };
+    });
+    gameConfig.manifest = manifest;
 
     fs.writeFileSync(configPath, JSON.stringify(webConfig, null, 4), 'utf8');
 

@@ -15,8 +15,8 @@ export const getMessages = (locale) => {
 };
 
 export const getLocale = () => {
-  // Try to get from localStorage first, then default to 'en'
-  return localStorage.getItem('locale') || 'en';
+  // Try to get from localStorage first, then default to 'es'
+  return localStorage.getItem('locale') || 'es';
 };
 
 export const setLocale = (locale) => {

@@ -302,8 +302,8 @@ const MainWindow = () => {
                 {getMessages(currentLocale).language}:
               </label>
                 <div className={`language-dropdown ${game?.name}`}>
-                  <div className={`language-dropdown-selected ${isUpdating ? 'disabled' : ''}`} onClick={() => {
-                    if (isUpdating) return; // Block interaction during updates
+                  <div className="language-dropdown-selected" onClick={() => {
+                    // Close all other dropdowns first
                     
                     // Close all other dropdowns first
                     const allLanguageDropdowns = document.querySelectorAll('.language-dropdown-options');
