@@ -179,6 +179,33 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
           startButton.removeEventListener("click", resumeClientDownload);
           disabledButton.style.display = "block";
 
+          // Post-download SHA-256 integrity verification of volume chunks before extraction
+          showText(`.txt-status.${game?.name}`, getTranslatedText("verifyingIntegrity") || "Verificando integridad de archivos descargados...");
+          const verifyFileHashFn = (window.electronAPI && window.electronAPI.verifyFileHash)
+            ? window.electronAPI.verifyFileHash
+            : (fp) => ipcRenderer.invoke("verify-file-hash", fp);
+
+          for (let i = 0; i < chunkUrls.length; i++) {
+            const chunkUrl = chunkUrls[i];
+            const fn = getFileNameFromUrl(chunkUrl);
+            const chunkPath = `${currentDir}\\${game?.name}\\${fn}`;
+            
+            const expectedHash = (game.clientChunksHashes && game.clientChunksHashes[i]) ||
+                                 (game.clientHashesMap && game.clientHashesMap[fn]);
+
+            if (expectedHash && fs.existsSync(chunkPath)) {
+              const res = await verifyFileHashFn(chunkPath);
+              if (!res.success || res.hash.toLowerCase() !== expectedHash.toLowerCase()) {
+                console.error(`Post-download hash mismatch for ${fn}. Expected ${expectedHash}, got ${res.hash}`);
+                try { await fsPromises.unlink(chunkPath); } catch (e) {}
+                showError("Verificación de integridad fallida. Archivo descargado corrupto. Reintentando...");
+                setIsUpdating(false);
+                downloadStates[`${game.name}_client`] = false;
+                return;
+              }
+            }
+          }
+
           showText(`.txt-status.${game?.name}`, getTranslatedText("extractingClient"));
           const firstChunkFileName = getFileNameFromUrl(chunkUrls[0]);
           const firstChunkPath = `${currentDir}\\${game?.name}\\${firstChunkFileName}`;
@@ -361,6 +388,28 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
           });
 
           ipcRenderer.once("download patch complete", async () => {
+            const patchFileName = patchUrl.split("/").pop();
+            const expectedPatchHash = (game.patchUrlsHashes && game.patchUrlsHashes[patchIndex - 1]) ||
+                                      (game.patchHashesMap && game.patchHashesMap[patchFileName]);
+
+            if (expectedPatchHash && fs.existsSync(patchZipPath)) {
+              showText(`.txt-status.${game.name}`, "Verificando integridad del parche...");
+              const verifyFileHashFn = (window.electronAPI && window.electronAPI.verifyFileHash)
+                ? window.electronAPI.verifyFileHash
+                : (fp) => ipcRenderer.invoke("verify-file-hash", fp);
+
+              const res = await verifyFileHashFn(patchZipPath);
+              if (!res.success || res.hash.toLowerCase() !== expectedPatchHash.toLowerCase()) {
+                console.error(`Patch SHA-256 hash mismatch for ${patchFileName}. Expected ${expectedPatchHash}, got ${res.hash}`);
+                try { await fsPromises.unlink(patchZipPath); } catch (e) {}
+                showError("Parche descargado corrupto (fallo de hash). Reintentando descarga...");
+                downloadStates[`${game.name}_patches`] = false;
+                delete downloadStartTimes[`${game.name}_patch`];
+                setIsUpdating(false);
+                return;
+              }
+            }
+
             showText(
               `.txt-status.${game.name}`,
               getTranslatedText("extractingPatch", { number: patchIndex })
@@ -505,42 +554,63 @@ export const gamesPatch = async (game, setIsUpdating, maintenance = false) => {
         startButton.removeEventListener("click", handleInstallClick);
         startButton.removeEventListener("click", handlePatchClick);
         startButton.addEventListener("click", async () => {
+          const gameFolder = isDevelopment ? `${currentDir}\\${game.name}` : `${currentDir}\\${game.name}`;
+
+          // Pre-launch Anti-Tamper SHA-256 integrity check against manifest
+          if (game.manifest && typeof game.manifest === "object" && Object.keys(game.manifest).length > 0) {
+            showText(`.txt-status.${game?.name}`, "Verificando integridad Anti-Tamper...");
+            const { verifyIntegrity } = require("./utils/verifyIntegrity");
+            const integrityResult = await verifyIntegrity(gameFolder, game.manifest, (progress) => {
+              showText(`.txt-status.${game?.name}`, `Anti-Tamper Check: ${progress.percent}%`);
+            });
+
+            if (!integrityResult.valid) {
+              console.warn("Anti-Tamper check failed for modified files:", integrityResult.corruptedFiles);
+              showText(`.txt-status.${game?.name}`, getTranslatedText("installationCorrupted") || "Archivos alterados detectados");
+              showText(`.btn-start.${game?.name}`, getTranslatedText("repair") || "Reparar");
+              showText(`.btn-start.disabled.${game?.name}`, getTranslatedText("repair") || "Reparar");
+              showError("Anti-Tamper: Se detectaron archivos del juego modificados o corruptos. Haz clic en Reparar para solucionar.");
+              await repairGame(game, setIsUpdating);
+              return;
+            }
+          }
+
           if (!isGameValid()) {
             showError(getTranslatedText("errorLaunching"));
             await repairGame(game, setIsUpdating);
             return;
           }
 
-          const { spawn } = require("child_process");
-          
-          // Get the selected language from the config
+          // Read language and voice pack configuration
           const configLocalPath = isDevelopment
             ? CONFIG.FILE_NAME
             : `${currentDir}\\${CONFIG.FILE_NAME}`;
           const configData = await fsPromises.readFile(configLocalPath, "utf8");
           const config = JSON.parse(configData);
           const selectedLanguage = config.selectedLanguage || CONFIG.DEFAULT_LANGUAGE;
-          
-          // Get the selected voice pack from the current game's config
           const currentGame = config.games?.find(g => g.name === game.name);
           const selectedVoicePack = currentGame?.selectedVoicePack || CONFIG.DEFAULT_VOICE_PACK;
           
-          // Replace language placeholder in startCmd if it exists
-          let finalStartCmd = game.startCmd;
-          if (game.startCmd && game.startCmd.includes(GAME_PARAMS.LANGUAGE_PLACEHOLDER)) {
-            let languageParam = selectedLanguage;
-            if (selectedVoicePack && selectedVoicePack !== '') {
-              languageParam = `${selectedLanguage}_${selectedVoicePack}`;
-            }
-            finalStartCmd = game.startCmd.replace(GAME_PARAMS.LANGUAGE_PLACEHOLDER, languageParam);
+          let languageParam = selectedLanguage;
+          if (selectedVoicePack && selectedVoicePack !== '') {
+            languageParam = `${selectedLanguage}_${selectedVoicePack}`;
           }
-          
-          spawn(finalStartCmd, {
-            cwd: currentDir + `\\${game.name}\\`,
-            detached: true,
-            shell: true,
+
+          // Launch securely using Crypto Token IPC
+          const launchGameSecureFn = (window.electronAPI && window.electronAPI.launchGameSecure)
+            ? window.electronAPI.launchGameSecure
+            : (params) => ipcRenderer.invoke("launch-game-secure", params);
+
+          const launchResult = await launchGameSecureFn({
+            gameFolder,
+            startCmd: game.startCmd,
+            gameName: game.name,
+            languageParam
           });
-          ipcRenderer.send("close-app");
+
+          if (!launchResult.success) {
+            showError(`Error al iniciar el juego: ${launchResult.error}`);
+          }
         });
       }
     };

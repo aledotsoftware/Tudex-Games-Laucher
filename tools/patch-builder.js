@@ -335,6 +335,21 @@ async function main() {
 
     const chunkUrls = generatedChunks.map(c => `${options.baseUrl}/games/${gameName}/${c}`);
 
+    // Helper to calculate SHA-256 hashes for volume chunks (.7z files)
+    const computeVolumeHashes = (dir, chunkNames) => {
+        const hashes = [];
+        const hashMap = {};
+        chunkNames.forEach(cName => {
+            const fullChunkPath = path.join(dir, cName);
+            if (fs.existsSync(fullChunkPath)) {
+                const hash = getFileHash(fullChunkPath);
+                hashes.push(hash);
+                hashMap[cName] = hash;
+            }
+        });
+        return { hashes, hashMap };
+    };
+
     // Generate manifest checksums for integrity verification across all files
     console.log('\nGenerating SHA-256 file integrity manifest for target build...');
     const manifest = {};
@@ -348,14 +363,21 @@ async function main() {
 
     if (isDifferential) {
         gameConfig.patchUrls = chunkUrls;
+        const { hashes: patchHashes, hashMap: patchMap } = computeVolumeHashes(targetGameOutDir, generatedChunks);
+        gameConfig.patchUrlsHashes = patchHashes;
+        gameConfig.patchHashesMap = { ...(gameConfig.patchHashesMap || {}), ...patchMap };
         gameConfig.patchVer = options.version;
     } else {
         gameConfig.clientVer = options.version;
         gameConfig.patchVer = 0;
         gameConfig.patchUrls = [];
+        gameConfig.patchUrlsHashes = [];
         if (chunkUrls.length > 0) {
             gameConfig.clientUrl = chunkUrls[0];
             gameConfig.clientChunks = chunkUrls;
+            const { hashes: clientHashes, hashMap: clientMap } = computeVolumeHashes(targetGameOutDir, generatedChunks);
+            gameConfig.clientChunksHashes = clientHashes;
+            gameConfig.clientHashesMap = clientMap;
         }
     }
 
@@ -384,6 +406,9 @@ async function main() {
         if (clientChunks.length > 0) {
             gameConfig.clientUrl = `${options.baseUrl}/games/${gameName}/${clientChunks[0]}`;
             gameConfig.clientChunks = clientChunks.map(c => `${options.baseUrl}/games/${gameName}/${c}`);
+            const { hashes: fullClientHashes, hashMap: fullClientMap } = computeVolumeHashes(targetGameOutDir, clientChunks);
+            gameConfig.clientChunksHashes = fullClientHashes;
+            gameConfig.clientHashesMap = fullClientMap;
             gameConfig.clientVer = 1;
         }
     }

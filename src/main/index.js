@@ -153,6 +153,75 @@ app.on("ready", () => {
     return result.filePaths[0];
   });
 
+  ipcMain.handle("verify-file-hash", async (event, filePath) => {
+    const { Worker } = require("worker_threads");
+    const fs = require("fs");
+    let workerScript = path.join(__dirname, "hashWorker.js");
+    if (!fs.existsSync(workerScript)) {
+      workerScript = path.resolve(process.cwd(), "src", "main", "hashWorker.js");
+    }
+
+    return new Promise((resolve) => {
+      try {
+        const worker = new Worker(workerScript, {
+          workerData: { filePath }
+        });
+
+        worker.on("message", (message) => {
+          if (message.success) {
+            resolve({ success: true, hash: message.hash, filePath });
+          } else {
+            resolve({ success: false, error: message.error, filePath });
+          }
+        });
+
+        worker.on("error", (error) => {
+          resolve({ success: false, error: error.message, filePath });
+        });
+
+        worker.on("exit", (code) => {
+          if (code !== 0) {
+            resolve({ success: false, error: `Worker stopped with exit code ${code}`, filePath });
+          }
+        });
+      } catch (err) {
+        resolve({ success: false, error: err.message, filePath });
+      }
+    });
+  });
+
+  ipcMain.handle("launch-game-secure", async (event, { gameFolder, startCmd, gameName, languageParam, secret = "TudexLauncherSecretKey2026" }) => {
+    const { spawn } = require("child_process");
+    const crypto = require("crypto");
+    
+    try {
+      const timestamp = Date.now();
+      const nonce = crypto.randomBytes(16).toString("hex");
+      const payload = `${gameName}:${timestamp}:${nonce}`;
+      const signature = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+      const launchToken = `${payload}:${signature}`;
+
+      let finalCmd = startCmd;
+      if (finalCmd && finalCmd.includes("EGULANG")) {
+        finalCmd = finalCmd.replace("EGULANG", languageParam || "ES");
+      }
+
+      const fullCmd = `${finalCmd} --launcher-token="${launchToken}"`;
+
+      spawn(fullCmd, {
+        cwd: gameFolder,
+        detached: true,
+        shell: true,
+      });
+
+      app.exit();
+      return { success: true, launchToken };
+    } catch (err) {
+      console.error("Error launching game securely:", err);
+      return { success: false, error: err.message };
+    }
+  });
+
   ipcMain.on("run-patch-builder", async (event, params) => {
     const { spawn } = require("child_process");
     const fs = require("fs");

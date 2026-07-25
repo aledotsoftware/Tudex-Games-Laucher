@@ -1,9 +1,7 @@
-import fs from "fs";
-import path from "path";
-import crypto from "crypto";
-
 /**
- * Verifies final game files on disk against remote SHA-256 manifest
+ * Asynchronously verifies game files against remote SHA-256 manifest
+ * using Node.js Worker Threads via Electron IPC (preload bridge).
+ * Keeps the React UI 100% responsive.
  */
 export async function verifyIntegrity(gameDir, manifest, progressCallback = null) {
   if (!manifest || typeof manifest !== "object" || Object.keys(manifest).length === 0) {
@@ -14,8 +12,15 @@ export async function verifyIntegrity(gameDir, manifest, progressCallback = null
   const corruptedFiles = [];
   let processed = 0;
 
+  const verifyFileHash = window.electronAPI && window.electronAPI.verifyFileHash
+    ? window.electronAPI.verifyFileHash
+    : async (fp) => {
+        const { ipcRenderer } = require("electron");
+        return await ipcRenderer.invoke("verify-file-hash", fp);
+      };
+
   for (const [relativePath, meta] of entries) {
-    const fullPath = path.join(gameDir, relativePath);
+    const fullPath = `${gameDir}\\${relativePath.replace(/\//g, '\\')}`;
     processed++;
 
     if (progressCallback) {
@@ -27,36 +32,18 @@ export async function verifyIntegrity(gameDir, manifest, progressCallback = null
       });
     }
 
-    if (!fs.existsSync(fullPath)) {
-      corruptedFiles.push({ relativePath, error: "MISSING_FILE" });
-      continue;
-    }
-
     try {
-      const stat = fs.statSync(fullPath);
-      if (meta.size && stat.size !== meta.size) {
-        corruptedFiles.push({ relativePath, error: "SIZE_MISMATCH", expected: meta.size, actual: stat.size });
-        continue;
-      }
-
       if (meta.hash) {
-        const hashSum = crypto.createHash("sha256");
-        const fd = fs.openSync(fullPath, "r");
-        const bufferSize = 4 * 1024 * 1024; // 4MB buffer
-        const buffer = Buffer.alloc(bufferSize);
-        let bytesRead = 0;
-
-        try {
-          while ((bytesRead = fs.readSync(fd, buffer, 0, bufferSize, null)) > 0) {
-            hashSum.update(buffer.subarray(0, bytesRead));
-          }
-        } finally {
-          try { fs.closeSync(fd); } catch (e) {}
-        }
-
-        const calculatedHash = hashSum.digest("hex");
-        if (calculatedHash !== meta.hash) {
-          corruptedFiles.push({ relativePath, error: "HASH_MISMATCH", expected: meta.hash, actual: calculatedHash });
+        const result = await verifyFileHash(fullPath);
+        if (!result.success) {
+          corruptedFiles.push({ relativePath, error: result.error || "MISSING_OR_UNREADABLE" });
+        } else if (result.hash.toLowerCase() !== meta.hash.toLowerCase()) {
+          corruptedFiles.push({
+            relativePath,
+            error: "HASH_MISMATCH",
+            expected: meta.hash,
+            actual: result.hash
+          });
         }
       }
     } catch (err) {
