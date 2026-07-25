@@ -1,0 +1,37 @@
+import { gamesSetup } from "../gamesSetup";
+import fs from 'fs';
+
+export const setupGames = async (configRemote, configLocalPath, setDidFinishGamesSetup, showError) => {
+  try {
+    // Populate local config with games from remote config
+    const data = fs.readFileSync(configLocalPath, 'utf8');
+    const config = JSON.parse(data);
+    
+    const gamesList = (configRemote?.games && configRemote.games.length > 0)
+      ? configRemote.games
+      : [{ name: "neo", clientVer: 0, patchVer: 0 }];
+
+    // Add games to local config if they don't exist
+    for (const remoteGame of gamesList) {
+      const existingGame = config.games?.find(g => g.name === remoteGame.name);
+      if (!existingGame) {
+        if (!config.games) config.games = [];
+        config.games.push({
+          name: remoteGame.name,
+          clientVer: 0,
+          patchVer: 0
+        });
+      }
+    }
+    
+    // Write updated config back
+    fs.writeFileSync(configLocalPath, JSON.stringify(config, null, 4), 'utf8');
+    
+    for (const game of gamesList) {
+      await gamesSetup(game);
+    }
+    setDidFinishGamesSetup(true);
+  } catch (e) {
+    showError(e);
+  }
+};
